@@ -146,13 +146,13 @@ class TestRenderThread extends Thread {
 
     for (int y = 0; y < height; ++y) {
 
-      double rayz = fovTan * (.5 - ((double) y) / height);
+      double rayZ = fovTan * (.5 - ((double) y) / height);
 
       for (int x = 0; x < width; ++x) {
-        double rayx = fovTan * aspect * (.5 - ((double) x) / width);
+        double rayX = fovTan * aspect * (.5 - ((double) x) / width);
 
         ray.setDefault();
-        ray.d.set(rayx, 1, rayz);
+        ray.d.set(rayX, 1, rayZ);
         ray.d.normalize();
         transform.transform(ray.d);
 
@@ -168,16 +168,18 @@ class TestRenderThread extends Thread {
   }
 
   private void trace(Ray ray) {
-    double[] nearfar = new double[2];
-    enterBlock(ray, nearfar);
-    double tNear = nearfar[0];
-    double tFar = nearfar[1];
+    double[] nearFar = new double[2];
+    enterBlock(ray, nearFar);
+    double tNear = nearFar[0];
+    double tFar = nearFar[1];
 
     ray.color.set(1, 1, 1, 1);
 
     if (tNear <= tFar && tFar >= 0) {
-      ray.o.scaleAdd(tNear, ray.d);
-      ray.distance += tNear;
+      if (tNear > 0) {
+        ray.o.scaleAdd(tNear, ray.d);
+        ray.distance += tNear;
+      }
 
       if (drawCompass) {
         renderCompass(ray);
@@ -274,7 +276,10 @@ class TestRenderThread extends Thread {
     }
   }
 
-  private void enterBlock(Ray ray, double[] nearfar) {
+  /**
+   * Advance the ray until it enters the center voxel.
+   */
+  private void enterBlock(Ray ray, double[] nearFar) {
     int level = 0;
     double t1, t2;
     double tNear = Double.NEGATIVE_INFINITY;
@@ -292,10 +297,12 @@ class TestRenderThread extends Thread {
         t2 = t;
       }
 
-      if (t1 > tNear)
+      if (t1 > tNear) {
         tNear = t1;
-      if (t2 < tFar)
+      }
+      if (t2 < tFar) {
         tFar = t2;
+      }
     }
 
     if (d.y != 0) {
@@ -308,10 +315,12 @@ class TestRenderThread extends Thread {
         t2 = t;
       }
 
-      if (t1 > tNear)
+      if (t1 > tNear) {
         tNear = t1;
-      if (t2 < tFar)
+      }
+      if (t2 < tFar) {
         tFar = t2;
+      }
     }
 
     if (d.z != 0) {
@@ -324,14 +333,16 @@ class TestRenderThread extends Thread {
         t2 = t;
       }
 
-      if (t1 > tNear)
+      if (t1 > tNear) {
         tNear = t1;
-      if (t2 < tFar)
+      }
+      if (t2 < tFar) {
         tFar = t2;
+      }
     }
 
-    nearfar[0] = tNear;
-    nearfar[1] = tFar;
+    nearFar[0] = tNear;
+    nearFar[1] = tFar;
   }
 
 }
