@@ -183,9 +183,9 @@ class TestRenderThread extends Thread {
         renderCompass(ray);
       }
 
-      ray.setPrevMat(Block.AIR, 0);
+      ray.setPrevMaterial(Block.AIR, 0);
       Block theBlock = Block.get(blockId);
-      ray.setCurrentMat(theBlock, blockId);
+      ray.setCurrentMaterial(theBlock, blockId);
       theBlock.intersect(ray, scene);
     }
   }

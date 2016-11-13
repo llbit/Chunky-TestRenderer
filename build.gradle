@@ -13,7 +13,7 @@ sourceCompatibility = '1.8'
 targetCompatibility = '1.8'
 
 dependencies {
-	compile 'se.llbit:chunky-core:1.4.0-SNAPSHOT'
+	compile 'se.llbit:chunky-core:1.4.1'
 }
 
 mainClassName = 'se.llbit.chunky.TestRenderer'
