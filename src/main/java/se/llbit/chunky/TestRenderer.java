@@ -23,6 +23,8 @@ import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.control.CheckBox;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 import javafx.scene.image.Image;
 import javafx.scene.input.KeyEvent;
@@ -46,11 +48,13 @@ public class TestRenderer extends Application implements Initializable {
   @FXML private Canvas canvas;
   @FXML private CheckBox showCompass;
   @FXML private TextField blockId;
+  @FXML private ComboBox<String> model;
+  @FXML private Label frameTime;
 
   public TestRenderer() throws FileNotFoundException, TexturePackLoader.TextureLoadingError {
     TexturePackLoader.loadTexturePack(MinecraftFinder.getMinecraftJarNonNull(), false);
 
-    renderThread = new TestRenderThread(this);
+    renderThread = new TestRenderThread(this, 400, 400);
   }
 
   public static void main(String[] args) {
@@ -102,15 +106,20 @@ public class TestRenderer extends Application implements Initializable {
   @Override public void initialize(URL location, ResourceBundle resources) {
     showCompass.selectedProperty().addListener(
         (observable, oldValue, newValue) -> renderThread.enableCompass(newValue));
+    blockId.setText("" + renderThread.getBlockId());
     blockId.textProperty().addListener((observable, oldValue, newValue) -> {
       try {
         renderThread.setBlockId(Integer.parseInt(newValue));
       } catch (NumberFormatException ignored) {
       }
     });
+    model.getItems().addAll("block", "sprite");
+    model.getSelectionModel().select("block");
+    model.getSelectionModel().selectedItemProperty()
+        .addListener((observable, oldValue, newValue) -> renderThread.setModel(newValue));
   }
 
-  void drawImage(Image image) {
+  void drawImage(Image image, double time) {
     synchronized (drawLock) {
       if (!drawing) {
         drawing = true;
@@ -118,6 +127,10 @@ public class TestRenderer extends Application implements Initializable {
           // Synchronize to image to ensure we are not drawing it while its contents are changing.
           synchronized (image) {
             canvas.getGraphicsContext2D().drawImage(image, 0, 0);
+          }
+          frameTime.setText(String.format("%.1fms", time));
+          if (time > 50) {
+            System.out.format("Frame time: %.1fms%n", time);
           }
           drawing = false;
         });

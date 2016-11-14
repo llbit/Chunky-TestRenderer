@@ -30,9 +30,10 @@
             <TextField fx:id="blockId" />
          </children>
       </HBox>
-      <HBox>
+      <HBox alignment="BASELINE_RIGHT" spacing="10.0">
          <children>
             <CheckBox fx:id="showCompass" mnemonicParsing="false" text="Show compass" />
+            <Label fx:id="frameTime" text="Frame Time" />
          </children>
       </HBox>
    </children>

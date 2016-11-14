@@ -20,7 +20,11 @@ import javafx.scene.image.WritablePixelFormat;
 import org.apache.commons.math3.util.FastMath;
 import se.llbit.chunky.renderer.scene.Camera;
 import se.llbit.chunky.resources.BitmapImage;
+import se.llbit.chunky.resources.MinecraftFinder;
 import se.llbit.chunky.resources.Texture;
+import se.llbit.chunky.resources.TexturePackLoader;
+import se.llbit.chunky.resources.texturepack.SimpleTexture;
+import se.llbit.chunky.resources.texturepack.TextureRef;
 import se.llbit.chunky.world.Block;
 import se.llbit.math.ColorUtil;
 import se.llbit.math.Matrix3;
@@ -31,6 +35,8 @@ import se.llbit.math.Vector3;
 import se.llbit.math.Vector4;
 
 import java.nio.IntBuffer;
+import java.util.HashMap;
+import java.util.Map;
 
 class TestRenderThread extends Thread {
   private final WritablePixelFormat<IntBuffer> PIXEL_FORMAT = PixelFormat.getIntArgbInstance();
@@ -51,16 +57,22 @@ class TestRenderThread extends Thread {
 
   private final WritableImage image;
 
+  // TODO: handle canvas resizing.
+  private final int width;
+  private final int height;
   private BitmapImage buffer;
   private BitmapImage backBuffer;
-  private final int width = 400;
-  private final int height = 400;
+
+  private final Texture ironSword = new Texture();
 
   private boolean drawCompass = false;
   private boolean drawCompassNext = false;
 
   private int blockId = Block.GRASS_ID;
   private int blockIdNext = Block.GRASS_ID;
+
+  private String model = "block";
+  private String modelNext = "block";
 
   private double yaw, pitch;
   private boolean refresh = true;
@@ -72,21 +84,31 @@ class TestRenderThread extends Thread {
   private double distance;
   private double nextDistance = 1.5;
 
-  private static final Texture[] tex =
-      {new Texture("east"), new Texture("west"), new Texture("north"), new Texture("south"),};
+  private static final Texture[] compassTexture = {
+      new Texture("east"), new Texture("west"), new Texture("north"), new Texture("south")
+  };
 
-  private final Quad[] quads =
-      {new Quad(new Vector3(1, 0, 0), new Vector3(1, 0, 1), new Vector3(1, 1, 0),
+  private final Quad[] compassQuads = {
+      new Quad(new Vector3(1, 0, 0), new Vector3(1, 0, 1), new Vector3(1, 1, 0),
           new Vector4(0, 1, 0, 1)),
-          new Quad(new Vector3(0, 0, 1), new Vector3(0, 0, 0), new Vector3(0, 1, 1),
-              new Vector4(0, 1, 0, 1)),
-          new Quad(new Vector3(0, 0, 0), new Vector3(1, 0, 0), new Vector3(0, 1, 0),
-              new Vector4(0, 1, 0, 1)),
-          new Quad(new Vector3(1, 0, 1), new Vector3(0, 0, 1), new Vector3(1, 1, 1),
-              new Vector4(0, 1, 0, 1)),};
+      new Quad(new Vector3(0, 0, 1), new Vector3(0, 0, 0), new Vector3(0, 1, 1),
+          new Vector4(0, 1, 0, 1)),
+      new Quad(new Vector3(0, 0, 0), new Vector3(1, 0, 0), new Vector3(0, 1, 0),
+          new Vector4(0, 1, 0, 1)),
+      new Quad(new Vector3(1, 0, 1), new Vector3(0, 0, 1), new Vector3(1, 1, 1),
+          new Vector4(0, 1, 0, 1))
+  };
 
-  public TestRenderThread(TestRenderer testRenderer) {
+  public TestRenderThread(TestRenderer testRenderer, int width, int height) {
     this.testRenderer = testRenderer;
+    this.width = width;
+    this.height = height;
+
+    Map<String, TextureRef> textures = new HashMap<>();
+    textures.put("iron_sword", new SimpleTexture("assets/minecraft/textures/items/iron_sword",
+        ironSword));
+    TexturePackLoader.loadTextures(MinecraftFinder.getMinecraftJar(), textures.entrySet(),
+        () -> {});
 
     // Initialize render buffers.
     buffer = new BitmapImage(width, height);
@@ -114,10 +136,16 @@ class TestRenderThread extends Thread {
           distance = nextDistance;
           drawCompass = drawCompassNext;
           blockId = blockIdNext;
+          model = modelNext;
         }
 
+        long time;
         synchronized (renderLock) {
+          long start = System.nanoTime();
+
           drawFrame();
+
+          time = System.nanoTime() - start;
 
           // Flip buffers.
           BitmapImage tmp = backBuffer;
@@ -128,14 +156,13 @@ class TestRenderThread extends Thread {
                 .setPixels(0, 0, width, height, PIXEL_FORMAT, buffer.data, 0, width);
           }
         }
-        testRenderer.drawImage(image);
+        testRenderer.drawImage(image, time / 1000000.0);
       }
     } catch (InterruptedException ignored) {
     }
   }
 
   private void drawFrame() {
-
     double aspect = width / (double) height;
 
     Ray ray = new Ray();
@@ -152,6 +179,7 @@ class TestRenderThread extends Thread {
         double rayX = fovTan * aspect * (.5 - ((double) x) / width);
 
         ray.setDefault();
+        ray.t = Double.POSITIVE_INFINITY;
         ray.d.set(rayX, 1, rayZ);
         ray.d.normalize();
         transform.transform(ray.d);
@@ -175,23 +203,204 @@ class TestRenderThread extends Thread {
 
     ray.color.set(1, 1, 1, 1);
 
-    if (tNear <= tFar && tFar >= 0) {
-      if (tNear > 0) {
-        ray.o.scaleAdd(tNear, ray.d);
-        ray.distance += tNear;
-      }
+    if (model.equals("block")) {
+      if (tNear <= tFar && tFar >= 0) {
+        if (tNear > 0) {
+          ray.o.scaleAdd(tNear, ray.d);
+          ray.distance += tNear;
+        }
 
-      if (drawCompass) {
-        renderCompass(ray);
-      }
+        if (drawCompass) {
+          renderCompass(ray);
+        }
 
-      ray.setPrevMaterial(Block.AIR, 0);
-      Block theBlock = Block.get(blockId);
-      ray.setCurrentMaterial(theBlock, blockId);
-      theBlock.intersect(ray, scene);
+        ray.setPrevMaterial(Block.AIR, 0);
+        Block theBlock = Block.get(blockId);
+        ray.setCurrentMaterial(theBlock, blockId);
+        theBlock.intersect(ray, scene);
+      }
+    } else {
+      spriteIntersection(ray, ironSword);
     }
   }
 
+  public boolean spriteIntersection(Ray ray, Texture texture) {
+    double ox = ray.o.x;
+    double oy = ray.o.y;
+    double oz = ray.o.z;
+    double offsetX = 0.5;
+    double offsetY = 0.5;
+    double offsetZ = 0.5;
+    double inv_size = 16;
+    double cloudTop = offsetY + 1 / inv_size;
+    double t_offset = 0;
+    if (oy < offsetY || oy > cloudTop) {
+      if (ray.d.y > 0) {
+        t_offset = (offsetY - oy) / ray.d.y;
+      } else {
+        t_offset = (cloudTop - oy) / ray.d.y;
+      }
+      if (t_offset < 0) {
+        return false;
+      }
+      // Ray is entering the sprite.
+      double x0 = (ray.d.x * t_offset + ox) * inv_size + offsetX;
+      double z0 = (ray.d.z * t_offset + oz) * inv_size + offsetZ;
+      if (inSprite(texture, x0, z0)) {
+        ray.n.set(0, -Math.signum(ray.d.y), 0);
+        ray.color.set(getColor(texture, (int) Math.floor(x0), (int) Math.floor(z0)));
+        onSpriteEnter(ray, t_offset);
+        return true;
+      }
+    } else if (inSprite(texture, ox * inv_size + offsetX, oz * inv_size + offsetZ)) {
+      // We are inside the sprite - no intersection.
+      return false;
+    }
+    double tExit;
+    if (ray.d.y > 0) {
+      tExit = (cloudTop - oy) / ray.d.y - t_offset;
+    } else {
+      tExit = (offsetY - oy) / ray.d.y - t_offset;
+    }
+    if (ray.t < tExit) {
+      tExit = ray.t;
+    }
+    double x0 = (ox + ray.d.x * t_offset) * inv_size + offsetX;
+    double z0 = (oz + ray.d.z * t_offset) * inv_size + offsetZ;
+    double xp = x0;
+    double zp = z0;
+    int ix = (int) Math.floor(xp);
+    int iz = (int) Math.floor(zp);
+    int xmod = (int) Math.signum(ray.d.x), zmod = (int) Math.signum(ray.d.z);
+    int xo = (1 + xmod) / 2, zo = (1 + zmod) / 2;
+    double dx = Math.abs(ray.d.x) * inv_size;
+    double dz = Math.abs(ray.d.z) * inv_size;
+    double t = 0;
+    int i = 0;
+    int nx = 0, nz = 0;
+    if (dx > dz) {
+      double m = dz / dx;
+      double xrem = xmod * (ix + xo - xp);
+      double zlimit = xrem * m;
+      while (t < tExit) {
+        double zrem = zmod * (iz + zo - zp);
+        if (zrem < zlimit) {
+          iz += zmod;
+          if (inSprite(texture, ix, iz)) {
+            t = i / dx + zrem / dz;
+            nx = 0;
+            nz = -zmod;
+            break;
+          }
+          ix += xmod;
+          if (inSprite(texture, ix, iz)) {
+            t = (i + xrem) / dx;
+            nx = -xmod;
+            nz = 0;
+            break;
+          }
+        } else {
+          ix += xmod;
+          if (inSprite(texture, ix, iz)) {
+            t = (i + xrem) / dx;
+            nx = -xmod;
+            nz = 0;
+            break;
+          }
+          if (zrem <= m) {
+            iz += zmod;
+            if (inSprite(texture, ix, iz)) {
+              t = i / dx + zrem / dz;
+              nx = 0;
+              nz = -zmod;
+              break;
+            }
+          }
+        }
+        t = i / dx;
+        i += 1;
+        zp = z0 + zmod * i * m;
+      }
+    } else {
+      double m = dx / dz;
+      double zrem = zmod * (iz + zo - zp);
+      double xlimit = zrem * m;
+      while (t < tExit) {
+        double xrem = xmod * (ix + xo - xp);
+        if (xrem < xlimit) {
+          ix += xmod;
+          if (inSprite(texture, ix, iz)) {
+            t = i / dz + xrem / dx;
+            nx = -xmod;
+            nz = 0;
+            break;
+          }
+          iz += zmod;
+          if (inSprite(texture, ix, iz)) {
+            t = (i + zrem) / dz;
+            nx = 0;
+            nz = -zmod;
+            break;
+          }
+        } else {
+          iz += zmod;
+          if (inSprite(texture, ix, iz)) {
+            t = (i + zrem) / dz;
+            nx = 0;
+            nz = -zmod;
+            break;
+          }
+          if (xrem <= m) {
+            ix += xmod;
+            if (inSprite(texture, ix, iz)) {
+              t = i / dz + xrem / dx;
+              nx = -xmod;
+              nz = 0;
+              break;
+            }
+          }
+        }
+        t = i / dz;
+        i += 1;
+        xp = x0 + xmod * i * m;
+      }
+    }
+    int ny = 0;
+    if (t > tExit) {
+      return false;
+    }
+    ray.n.set(nx, ny, nz);
+    // Side intersection.
+    ray.color.set(getColor(texture, ix, iz));
+    onSpriteEnter(ray, t + t_offset);
+    return true;
+  }
+
+  private static void onSpriteEnter(Ray ray, double t) {
+    ray.t = t;
+    ray.o.scaleAdd(t, ray.d);
+    ray.setPrevMaterial(Block.AIR, 0);
+    ray.setCurrentMaterial(Block.get(Block.STONE_ID), 0);
+  }
+
+  private static boolean inSprite(Texture texture, double x, double z) {
+    return inSprite(texture, (int) Math.floor(x), (int) Math.floor(z));
+  }
+
+  private static boolean inSprite(Texture texture, int x, int z) {
+    if (x < 0 || x >= texture.getWidth() || z < 0 || z >= texture.getHeight()) {
+      return false;
+    }
+    float[] color = texture.getColor(x, z);
+    return color[3] != 0;
+  }
+
+  private static float[] getColor(Texture texture, int x, int z) {
+    if (x < 0 || x >= texture.getWidth() || z < 0 || z >= texture.getHeight()) {
+      throw new Error("Can't compute texture color");
+    }
+    return texture.getColor(x, z);
+  }
   private void awaitRefresh() throws InterruptedException {
     synchronized (stateLock) {
       while (!refresh) {
@@ -268,10 +477,10 @@ class TestRenderThread extends Thread {
 
   private void renderCompass(Ray ray) {
     ray.t = Double.POSITIVE_INFINITY;
-    for (int i = 0; i < quads.length; ++i) {
-      if (quads[i].intersect(ray)) {
+    for (int i = 0; i < compassQuads.length; ++i) {
+      if (compassQuads[i].intersect(ray)) {
         ray.t = ray.tNext;
-        tex[i].getColor(ray);
+        compassTexture[i].getColor(ray);
       }
     }
   }
@@ -345,4 +554,16 @@ class TestRenderThread extends Thread {
     nearFar[1] = tFar;
   }
 
+  public int getBlockId() {
+    synchronized (stateLock) {
+      return blockId;
+    }
+  }
+
+  public void setModel(String model) {
+    synchronized (stateLock) {
+      modelNext = model;
+      refresh();
+    }
+  }
 }
