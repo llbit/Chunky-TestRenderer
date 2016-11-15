@@ -32,6 +32,8 @@
       </HBox>
       <HBox alignment="BASELINE_RIGHT" spacing="10.0">
          <children>
+            <Label text="Data:" />
+            <TextField fx:id="dataField" />
             <CheckBox fx:id="showCompass" mnemonicParsing="false" text="Show compass" />
             <Label fx:id="frameTime" text="Frame Time" />
          </children>

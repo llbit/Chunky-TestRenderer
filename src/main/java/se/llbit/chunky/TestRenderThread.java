@@ -26,6 +26,7 @@ import se.llbit.chunky.resources.TexturePackLoader;
 import se.llbit.chunky.resources.texturepack.SimpleTexture;
 import se.llbit.chunky.resources.texturepack.TextureRef;
 import se.llbit.chunky.world.Block;
+import se.llbit.chunky.world.BlockData;
 import se.llbit.math.ColorUtil;
 import se.llbit.math.Matrix3;
 import se.llbit.math.Quad;
@@ -65,8 +66,13 @@ class TestRenderThread extends Thread {
 
   private final Texture ironSword = new Texture();
 
+  private TestModel testModel = new TestModel();
+
   private boolean drawCompass = false;
   private boolean drawCompassNext = false;
+
+  private int blockData = 0;
+  private int blockDataNext = 0;
 
   private int blockId = Block.GRASS_ID;
   private int blockIdNext = Block.GRASS_ID;
@@ -136,7 +142,9 @@ class TestRenderThread extends Thread {
           distance = nextDistance;
           drawCompass = drawCompassNext;
           blockId = blockIdNext;
+          blockData = blockDataNext;
           model = modelNext;
+          testModel.setUp();
         }
 
         long time;
@@ -203,24 +211,46 @@ class TestRenderThread extends Thread {
 
     ray.color.set(1, 1, 1, 1);
 
-    if (model.equals("block")) {
-      if (tNear <= tFar && tFar >= 0) {
-        if (tNear > 0) {
-          ray.o.scaleAdd(tNear, ray.d);
-          ray.distance += tNear;
-        }
+    switch (model) {
+      case "block":
+        if (tNear <= tFar && tFar >= 0) {
+          if (tNear > 0) {
+            ray.o.scaleAdd(tNear, ray.d);
+            ray.distance += tNear;
+          }
 
+          if (drawCompass) {
+            renderCompass(ray);
+          }
+
+          ray.setPrevMaterial(Block.AIR, 0);
+          Block theBlock = Block.get(blockId);
+          ray.setCurrentMaterial(theBlock, blockId | (blockData << BlockData.OFFSET));
+          theBlock.intersect(ray, scene);
+        }
+        break;
+      case "sprite":
         if (drawCompass) {
           renderCompass(ray);
         }
+        spriteIntersection(ray, ironSword);
+        break;
+      case "custom":
+        if (tNear <= tFar && tFar >= 0) {
+          if (tNear > 0) {
+            ray.o.scaleAdd(tNear, ray.d);
+            ray.distance += tNear;
+          }
 
-        ray.setPrevMaterial(Block.AIR, 0);
-        Block theBlock = Block.get(blockId);
-        ray.setCurrentMaterial(theBlock, blockId);
-        theBlock.intersect(ray, scene);
-      }
-    } else {
-      spriteIntersection(ray, ironSword);
+          if (drawCompass) {
+            renderCompass(ray);
+          }
+
+          ray.setPrevMaterial(Block.AIR, 0);
+          ray.setCurrentMaterial(Block.get(blockId), blockId | (blockData << BlockData.OFFSET));
+          testModel.intersect(ray);
+        }
+        break;
     }
   }
 
@@ -470,6 +500,15 @@ class TestRenderThread extends Thread {
     synchronized (stateLock) {
       if (blockIdNext != blockId) {
         blockIdNext = blockId;
+        refresh();
+      }
+    }
+  }
+
+  public void setBlockData(int data) {
+    synchronized (stateLock) {
+      if (blockDataNext != data) {
+        blockDataNext = data;
         refresh();
       }
     }

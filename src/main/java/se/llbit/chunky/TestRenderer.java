@@ -48,6 +48,7 @@ public class TestRenderer extends Application implements Initializable {
   @FXML private Canvas canvas;
   @FXML private CheckBox showCompass;
   @FXML private TextField blockId;
+  @FXML private TextField dataField;
   @FXML private ComboBox<String> model;
   @FXML private Label frameTime;
 
@@ -113,7 +114,14 @@ public class TestRenderer extends Application implements Initializable {
       } catch (NumberFormatException ignored) {
       }
     });
-    model.getItems().addAll("block", "sprite");
+    dataField.setText("0");
+    dataField.textProperty().addListener((observable, oldValue, newValue) -> {
+      try {
+        renderThread.setBlockData(Integer.parseInt(newValue));
+      } catch (NumberFormatException ignored) {
+      }
+    });
+    model.getItems().addAll("block", "sprite", "custom");
     model.getSelectionModel().select("block");
     model.getSelectionModel().selectedItemProperty()
         .addListener((observable, oldValue, newValue) -> renderThread.setModel(newValue));
