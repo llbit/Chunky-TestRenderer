@@ -90,8 +90,13 @@ class TestRenderThread extends Thread {
   private double distance;
   private double nextDistance = 1.5;
 
+  private static final Texture east = new Texture("east");
+  private static final Texture west = new Texture("west");
+  private static final Texture north = new Texture("north");
+  private static final Texture south = new Texture("south");
+
   private static final Texture[] compassTexture = {
-      new Texture("east"), new Texture("west"), new Texture("north"), new Texture("south")
+      east, west, north, south
   };
 
   private final Quad[] compassQuads = {
@@ -132,7 +137,6 @@ class TestRenderThread extends Thread {
   }
 
   @Override public void run() {
-
     try {
       while (!isInterrupted()) {
 
@@ -210,6 +214,7 @@ class TestRenderThread extends Thread {
     double tFar = nearFar[1];
 
     ray.color.set(1, 1, 1, 1);
+    drawBigCompass(ray);
 
     switch (model) {
       case "block":
@@ -219,10 +224,6 @@ class TestRenderThread extends Thread {
             ray.distance += tNear;
           }
 
-          if (drawCompass) {
-            renderCompass(ray);
-          }
-
           ray.setPrevMaterial(Block.AIR, 0);
           Block theBlock = Block.get(blockId);
           ray.setCurrentMaterial(theBlock, blockId | (blockData << BlockData.OFFSET));
@@ -230,9 +231,6 @@ class TestRenderThread extends Thread {
         }
         break;
       case "sprite":
-        if (drawCompass) {
-          renderCompass(ray);
-        }
         spriteIntersection(ray, ironSword);
         break;
       case "custom":
@@ -240,10 +238,6 @@ class TestRenderThread extends Thread {
           if (tNear > 0) {
             ray.o.scaleAdd(tNear, ray.d);
             ray.distance += tNear;
-          }
-
-          if (drawCompass) {
-            renderCompass(ray);
           }
 
           ray.setPrevMaterial(Block.AIR, 0);
@@ -514,13 +508,29 @@ class TestRenderThread extends Thread {
     }
   }
 
-  private void renderCompass(Ray ray) {
-    ray.t = Double.POSITIVE_INFINITY;
-    for (int i = 0; i < compassQuads.length; ++i) {
-      if (compassQuads[i].intersect(ray)) {
-        ray.t = ray.tNext;
-        compassTexture[i].getColor(ray);
+  private Ray scratchRay = new Ray();
+
+  private void drawBigCompass(Ray ray) {
+    scratchRay.d.set(ray.d);
+    scratchRay.o.set(0.5, 0.5, 0.5);
+    double[] near = new double[2];
+    enterBlock(scratchRay, near);
+    scratchRay.o.scaleAdd(near[0], ray.d);
+    double x = scratchRay.o.x;
+    double y = scratchRay.o.y;
+    double z = scratchRay.o.z;
+    if (drawCompass) {
+      if (x > 1 - Ray.EPSILON) {
+        west.getColor(1 - z, 1 - y, ray.color);
+      } else if (x < Ray.EPSILON) {
+        east.getColor(z, 1 - y, ray.color);
+      } else if (z > 1 - Ray.EPSILON) {
+        south.getColor(x, 1 - y, ray.color);
+      } else if (z < Ray.EPSILON) {
+        north.getColor(1 - x, 1 - y, ray.color);
       }
+    } else {
+      ray.color.set(x, y, z, 1);
     }
   }
 
@@ -528,7 +538,6 @@ class TestRenderThread extends Thread {
    * Advance the ray until it enters the center voxel.
    */
   private void enterBlock(Ray ray, double[] nearFar) {
-    int level = 0;
     double t1, t2;
     double tNear = Double.NEGATIVE_INFINITY;
     double tFar = Double.POSITIVE_INFINITY;
@@ -537,7 +546,7 @@ class TestRenderThread extends Thread {
 
     if (d.x != 0) {
       t1 = -o.x / d.x;
-      t2 = ((1 << level) - o.x) / d.x;
+      t2 = (1 - o.x) / d.x;
 
       if (t1 > t2) {
         double t = t1;
@@ -555,7 +564,7 @@ class TestRenderThread extends Thread {
 
     if (d.y != 0) {
       t1 = -o.y / d.y;
-      t2 = ((1 << level) - o.y) / d.y;
+      t2 = (1 - o.y) / d.y;
 
       if (t1 > t2) {
         double t = t1;
@@ -573,7 +582,7 @@ class TestRenderThread extends Thread {
 
     if (d.z != 0) {
       t1 = -o.z / d.z;
-      t2 = ((1 << level) - o.z) / d.z;
+      t2 = (1 - o.z) / d.z;
 
       if (t1 > t2) {
         double t = t1;
