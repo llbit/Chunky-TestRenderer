@@ -24,16 +24,14 @@ import se.llbit.chunky.resources.MinecraftFinder;
 import se.llbit.chunky.resources.Texture;
 import se.llbit.chunky.resources.TexturePackLoader;
 import se.llbit.chunky.resources.texturepack.SimpleTexture;
-import se.llbit.chunky.resources.texturepack.TextureRef;
+import se.llbit.chunky.resources.texturepack.TextureLoader;
 import se.llbit.chunky.world.Block;
 import se.llbit.chunky.world.BlockData;
 import se.llbit.math.ColorUtil;
 import se.llbit.math.Matrix3;
-import se.llbit.math.Quad;
 import se.llbit.math.QuickMath;
 import se.llbit.math.Ray;
 import se.llbit.math.Vector3;
-import se.llbit.math.Vector4;
 
 import java.nio.IntBuffer;
 import java.util.HashMap;
@@ -95,27 +93,12 @@ class TestRenderThread extends Thread {
   private static final Texture north = new Texture("north");
   private static final Texture south = new Texture("south");
 
-  private static final Texture[] compassTexture = {
-      east, west, north, south
-  };
-
-  private final Quad[] compassQuads = {
-      new Quad(new Vector3(1, 0, 0), new Vector3(1, 0, 1), new Vector3(1, 1, 0),
-          new Vector4(0, 1, 0, 1)),
-      new Quad(new Vector3(0, 0, 1), new Vector3(0, 0, 0), new Vector3(0, 1, 1),
-          new Vector4(0, 1, 0, 1)),
-      new Quad(new Vector3(0, 0, 0), new Vector3(1, 0, 0), new Vector3(0, 1, 0),
-          new Vector4(0, 1, 0, 1)),
-      new Quad(new Vector3(1, 0, 1), new Vector3(0, 0, 1), new Vector3(1, 1, 1),
-          new Vector4(0, 1, 0, 1))
-  };
-
   public TestRenderThread(TestRenderer testRenderer, int width, int height) {
     this.testRenderer = testRenderer;
     this.width = width;
     this.height = height;
 
-    Map<String, TextureRef> textures = new HashMap<>();
+    Map<String, TextureLoader> textures = new HashMap<>();
     textures.put("iron_sword", new SimpleTexture("assets/minecraft/textures/items/iron_sword",
         ironSword));
     TexturePackLoader.loadTextures(MinecraftFinder.getMinecraftJar(), textures.entrySet(),
@@ -132,7 +115,7 @@ class TestRenderThread extends Thread {
 
     // Initialize camera:
     yaw = -3 * Math.PI / 4;
-    pitch = -5 * Math.PI / 6;
+    pitch = -1 * Math.PI / 6;
     updateTransform();
   }
 
@@ -185,10 +168,10 @@ class TestRenderThread extends Thread {
 
     for (int y = 0; y < height; ++y) {
 
-      double rayZ = fovTan * (.5 - ((double) y) / height);
+      double rayZ = fovTan * (-0.5 + ((double) y) / height);
 
       for (int x = 0; x < width; ++x) {
-        double rayX = fovTan * aspect * (.5 - ((double) x) / width);
+        double rayX = fovTan * aspect * (0.5 - ((double) x) / width);
 
         ray.setDefault();
         ray.t = Double.POSITIVE_INFINITY;
@@ -214,7 +197,7 @@ class TestRenderThread extends Thread {
     double tFar = nearFar[1];
 
     ray.color.set(1, 1, 1, 1);
-    drawBigCompass(ray);
+    renderCompass(ray);
 
     switch (model) {
       case "block":
@@ -510,24 +493,24 @@ class TestRenderThread extends Thread {
 
   private Ray scratchRay = new Ray();
 
-  private void drawBigCompass(Ray ray) {
+  private void renderCompass(Ray ray) {
     scratchRay.d.set(ray.d);
     scratchRay.o.set(0.5, 0.5, 0.5);
     double[] near = new double[2];
     enterBlock(scratchRay, near);
-    scratchRay.o.scaleAdd(near[0], ray.d);
+    scratchRay.o.scaleAdd(near[1], ray.d);
     double x = scratchRay.o.x;
     double y = scratchRay.o.y;
     double z = scratchRay.o.z;
     if (drawCompass) {
-      if (x > 1 - Ray.EPSILON) {
-        west.getColor(1 - z, 1 - y, ray.color);
-      } else if (x < Ray.EPSILON) {
-        east.getColor(z, 1 - y, ray.color);
+      if (x < Ray.EPSILON) {
+        west.getColor(z, y, ray.color);
+      } else if (x > 1 - Ray.EPSILON) {
+        east.getColor(z, y, ray.color);
       } else if (z > 1 - Ray.EPSILON) {
-        south.getColor(x, 1 - y, ray.color);
+        south.getColor(1 - x, y, ray.color);
       } else if (z < Ray.EPSILON) {
-        north.getColor(1 - x, 1 - y, ray.color);
+        north.getColor(x, y, ray.color);
       }
     } else {
       ray.color.set(x, y, z, 1);

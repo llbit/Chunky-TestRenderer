@@ -35,6 +35,7 @@ import se.llbit.chunky.resources.TexturePackLoader;
 import java.io.FileNotFoundException;
 import java.net.URL;
 import java.util.ResourceBundle;
+import java.util.function.Consumer;
 
 public class TestRenderer extends Application implements Initializable {
 
@@ -109,22 +110,29 @@ public class TestRenderer extends Application implements Initializable {
         (observable, oldValue, newValue) -> renderThread.enableCompass(newValue));
     blockId.setText("" + renderThread.getBlockId());
     blockId.textProperty().addListener((observable, oldValue, newValue) -> {
-      try {
-        renderThread.setBlockId(Integer.parseInt(newValue));
-      } catch (NumberFormatException ignored) {
-      }
+      parseInteger(newValue, renderThread::setBlockId);
     });
     dataField.setText("0");
     dataField.textProperty().addListener((observable, oldValue, newValue) -> {
-      try {
-        renderThread.setBlockData(Integer.parseInt(newValue));
-      } catch (NumberFormatException ignored) {
-      }
+      parseInteger(newValue, renderThread::setBlockData);
     });
     model.getItems().addAll("block", "sprite", "custom");
     model.getSelectionModel().select("block");
     model.getSelectionModel().selectedItemProperty()
         .addListener((observable, oldValue, newValue) -> renderThread.setModel(newValue));
+  }
+
+  static void parseInteger(String text, Consumer<Integer> consumer) {
+    try {
+      if (text.startsWith("0x")) {
+        consumer.accept(Integer.parseInt(text.substring(2), 16));
+      } else if (text.startsWith("0b")) {
+        consumer.accept(Integer.parseInt(text.substring(2), 2));
+      } else {
+        consumer.accept(Integer.parseInt(text));
+      }
+    } catch (NumberFormatException ignored) {
+    }
   }
 
   void drawImage(Image image, double time) {
