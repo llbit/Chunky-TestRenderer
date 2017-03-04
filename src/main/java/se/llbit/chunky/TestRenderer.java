@@ -29,7 +29,6 @@ import javafx.scene.control.TextField;
 import javafx.scene.image.Image;
 import javafx.scene.input.KeyEvent;
 import javafx.stage.Stage;
-import se.llbit.chunky.resources.MinecraftFinder;
 import se.llbit.chunky.resources.TexturePackLoader;
 
 import java.io.FileNotFoundException;
@@ -53,9 +52,11 @@ public class TestRenderer extends Application implements Initializable {
   @FXML private ComboBox<String> model;
   @FXML private Label frameTime;
 
-  public TestRenderer() throws FileNotFoundException, TexturePackLoader.TextureLoadingError {
-    TexturePackLoader.loadTexturePack(MinecraftFinder.getMinecraftJarNonNull(), false);
+  public TestRenderer() throws FileNotFoundException {
+    // Load the default textures:
+    TexturePackLoader.loadTexturePacks(new String[0], false);
 
+    // Start rendering thread:
     renderThread = new TestRenderThread(this, 400, 400);
   }
 
@@ -98,7 +99,7 @@ public class TestRenderer extends Application implements Initializable {
       double dy = event.getY() - mouseY;
       mouseX = event.getX();
       mouseY = event.getY();
-      renderThread.panView(dx, dy);
+      renderThread.panView(-dx, -dy);
     });
 
     canvas.setOnScroll(event ->

@@ -101,8 +101,7 @@ class TestRenderThread extends Thread {
     Map<String, TextureLoader> textures = new HashMap<>();
     textures.put("iron_sword", new SimpleTexture("assets/minecraft/textures/items/iron_sword",
         ironSword));
-    TexturePackLoader.loadTextures(MinecraftFinder.getMinecraftJar(), textures.entrySet(),
-        () -> {});
+    TexturePackLoader.loadTextures(MinecraftFinder.getMinecraftJar(), textures.entrySet());
 
     // Initialize render buffers.
     buffer = new BitmapImage(width, height);
